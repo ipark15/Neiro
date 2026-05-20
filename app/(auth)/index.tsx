@@ -16,11 +16,12 @@ const { width } = Dimensions.get('window');
 
 const LANGUAGES = [
   { code: 'EN', label: 'English' },
+  { code: 'KO', label: '한국어' },
+  { code: 'JA', label: '日本語' },
   { code: 'ES', label: 'Español' },
   { code: 'FR', label: 'Français' },
   { code: 'PT', label: 'Português' },
   { code: 'DE', label: 'Deutsch' },
-  { code: 'JA', label: '日本語' },
 ];
 
 const INNER_RADIUS = 52;
@@ -28,14 +29,14 @@ const OUTER_RADIUS = 80;
 
 const INNER_DOTS = [
   { angle: 0, color: colors.lang.EN },
-  { angle: 120, color: colors.lang.ES },
-  { angle: 240, color: colors.lang.FR },
+  { angle: 120, color: colors.lang.KO },
+  { angle: 240, color: colors.lang.JA },
 ];
 
 const OUTER_DOTS = [
-  { angle: 60, color: colors.lang.PT },
-  { angle: 180, color: colors.lang.DE },
-  { angle: 300, color: colors.lang.JA },
+  { angle: 60, color: colors.lang.ES },
+  { angle: 180, color: colors.lang.FR },
+  { angle: 300, color: colors.lang.DE },
 ];
 
 function OrbitalDot({

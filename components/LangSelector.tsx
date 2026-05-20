@@ -3,11 +3,12 @@ import { colors, fonts, fontSize, spacing, radius } from '@/constants/theme';
 
 const LANGUAGES = [
   { code: 'EN', label: 'English' },
+  { code: 'KO', label: '한국어' },
+  { code: 'JA', label: '日本語' },
   { code: 'ES', label: 'Español' },
   { code: 'FR', label: 'Français' },
   { code: 'PT', label: 'Português' },
   { code: 'DE', label: 'Deutsch' },
-  { code: 'JA', label: '日本語' },
 ];
 
 interface LangSelectorProps {

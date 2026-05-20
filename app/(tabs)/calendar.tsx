@@ -56,7 +56,7 @@ function formatDuration(seconds: number | null): string {
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const LANG_NAMES: Record<string, string> = {
-  EN: 'English', ES: 'Español', FR: 'Français', PT: 'Português', DE: 'Deutsch', JA: '日本語',
+  EN: 'English', KO: '한국어', JA: '日本語', ES: 'Español', FR: 'Français', PT: 'Português', DE: 'Deutsch',
 };
 
 // ─── Audio player ─────────────────────────────────────────────────────────────

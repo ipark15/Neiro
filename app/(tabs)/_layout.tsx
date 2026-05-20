@@ -56,11 +56,15 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: colors.bgCard,
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
+    borderTopWidth: 0,
     height: 72,
     paddingBottom: 16,
     paddingTop: 8,
+    shadowColor: colors.textPrimary,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 12,
   },
   tabLabel: {
     fontFamily: fonts.mono,

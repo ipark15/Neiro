@@ -6,11 +6,12 @@ from groq import AsyncGroq
 # Groq returns ISO 639-1 codes ("en", "es"); map to our display codes
 LANG_MAP = {
     "en": "EN",
+    "ko": "KO",
+    "ja": "JA",
     "es": "ES",
     "fr": "FR",
     "pt": "PT",
     "de": "DE",
-    "ja": "JA",
 }
 
 

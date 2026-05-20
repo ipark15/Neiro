@@ -12,11 +12,12 @@ export const colors = {
 
   lang: {
     EN: '#4A7C59',
+    KO: '#C4922A',
+    JA: '#8B2A5C',
     ES: '#8B3A2A',
     FR: '#2A5C8B',
     PT: '#6B8B2A',
     DE: '#7A6E62',
-    JA: '#8B2A5C',
   } as Record<string, string>,
 
   border: '#D9D2C7',
