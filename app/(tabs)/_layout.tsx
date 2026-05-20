@@ -4,15 +4,22 @@ import { colors, fonts, fontSize, letterSpacing } from '@/constants/theme';
 
 function RecordIcon({ focused }: { focused: boolean }) {
   return (
-    <View style={[styles.recordDot, focused && styles.recordDotActive]} />
+    <View style={[styles.recordRing, focused && styles.recordRingActive]}>
+      <View style={[styles.recordDot, focused && styles.recordDotActive]} />
+    </View>
   );
 }
 
 function CalendarIcon({ focused }: { focused: boolean }) {
+  const c = focused ? colors.terracotta : colors.textSecondary;
   return (
-    <View style={[styles.calendarIcon, focused && styles.calendarIconActive]}>
-      <View style={styles.calendarTop} />
-      <View style={styles.calendarGrid} />
+    <View style={[styles.calWrap, { borderColor: c }]}>
+      <View style={[styles.calHeader, { backgroundColor: c }]} />
+      <View style={styles.calGrid}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <View key={i} style={[styles.calDot, { backgroundColor: c }]} />
+        ))}
+      </View>
     </View>
   );
 }
@@ -60,32 +67,50 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     letterSpacing: letterSpacing.wide,
   },
+  // Record icon: outer ring + inner filled dot
+  recordRing: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: colors.textSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordRingActive: {
+    borderColor: colors.terracotta,
+  },
   recordDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: colors.textSecondary,
   },
   recordDotActive: {
     backgroundColor: colors.terracotta,
   },
-  calendarIcon: {
-    width: 16,
-    height: 16,
+  // Calendar icon: border box with header strip + dot grid
+  calWrap: {
+    width: 18,
+    height: 17,
     borderWidth: 1.5,
-    borderColor: colors.textSecondary,
-    borderRadius: 2,
+    borderRadius: 3,
     overflow: 'hidden',
   },
-  calendarIconActive: {
-    borderColor: colors.terracotta,
+  calHeader: {
+    height: 5,
   },
-  calendarTop: {
-    height: 4,
-    backgroundColor: 'transparent',
-  },
-  calendarGrid: {
+  calGrid: {
     flex: 1,
-    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 2,
+    gap: 2,
+  },
+  calDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1,
+    opacity: 0.7,
   },
 });

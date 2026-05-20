@@ -30,6 +30,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
+# Claude Code
+CLAUDE.md
+
 # local env files
 .env
 .env*.local
@@ -37,6 +40,12 @@ backend/.env
 
 # typescript
 *.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+backend/venv/
 
 # generated native folders
 /ios

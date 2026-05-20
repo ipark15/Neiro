@@ -19,11 +19,15 @@ export async function uploadEntry(params: {
   file: { uri: string; name: string; type: string };
   user_id: string;
   date: string;
+  duration_seconds?: number;
 }): Promise<Entry> {
   const form = new FormData();
   form.append('file', params.file as unknown as Blob);
   form.append('user_id', params.user_id);
   form.append('date', params.date);
+  if (params.duration_seconds != null) {
+    form.append('duration_seconds', String(params.duration_seconds));
+  }
 
   const { data } = await api.post<Entry>('/entries', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
