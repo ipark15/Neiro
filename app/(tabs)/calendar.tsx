@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Audio } from 'expo-av';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { getEntries } from '@/lib/api';
@@ -186,6 +186,7 @@ const playerStyles = StyleSheet.create({
 // ─── Calendar screen ──────────────────────────────────────────────────────────
 
 export default function CalendarScreen() {
+  const router = useRouter();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -326,7 +327,11 @@ export default function CalendarScreen() {
         {/* Bottom section — always rendered with fixed min-height to prevent calendar shifting */}
         <View style={styles.bottomSection}>
           {selectedEntry ? (
-            <View style={styles.entryCard}>
+            <TouchableOpacity
+              style={styles.entryCard}
+              activeOpacity={0.85}
+              onPress={() => router.push({ pathname: '/entry/[id]', params: { id: selectedEntry.id, data: JSON.stringify(selectedEntry) } })}
+            >
               <View style={styles.entryCardHeader}>
                 <View>
                   <Text style={styles.entryDate}>{formatDisplayDate(selectedEntry.date)}</Text>
@@ -338,16 +343,20 @@ export default function CalendarScreen() {
               </View>
 
               {selectedEntry.transcript ? (
-                <Text style={styles.transcript} numberOfLines={3}>
+                <Text style={styles.transcript} numberOfLines={2}>
                   {selectedEntry.transcript}
                 </Text>
               ) : null}
+
+              <View style={styles.tapHint}>
+                <Text style={styles.tapHintText}>Tap to read full entry →</Text>
+              </View>
 
               <AudioPlayer
                 uri={selectedEntry.audio_url}
                 duration={selectedEntry.duration_seconds}
               />
-            </View>
+            </TouchableOpacity>
           ) : (
             !loading && (
               <View style={styles.emptyState}>
@@ -512,15 +521,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   entryDate: {
-    fontFamily: fonts.serifItalic,
-    fontSize: fontSize.sm,
-    color: colors.textSecondary,
+    fontFamily: fonts.serif,
+    fontSize: fontSize.md,
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   entryLang: {
     fontFamily: fonts.serifItalic,
-    fontSize: fontSize.md,
-    color: colors.textPrimary,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
   },
   langBadge: {
     paddingHorizontal: spacing.sm,
@@ -537,6 +546,14 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     color: colors.textPrimary,
     lineHeight: 22,
+  },
+  tapHint: {
+    alignItems: 'flex-end',
+  },
+  tapHintText: {
+    fontFamily: fonts.serifItalic,
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
   },
   bottomSection: {
     minHeight: 160,

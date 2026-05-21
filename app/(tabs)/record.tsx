@@ -95,12 +95,10 @@ export default function RecordScreen() {
         if (!s.isRecording) return;
         const metering = s.metering ?? -160;
         const normalized = Math.max(0, Math.min(1, (metering + 60) / 60));
-        setAmplitudes((prev) => {
-          const next = [...prev.slice(1), normalized];
-          return next;
-        });
+        setAmplitudes((prev) => [...prev.slice(1), normalized]);
       });
 
+      recording.setProgressUpdateInterval(80);
       await recording.startAsync();
       recordingRef.current = recording;
       setStatus('recording');
