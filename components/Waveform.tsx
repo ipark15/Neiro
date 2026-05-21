@@ -1,22 +1,18 @@
-import { View, StyleSheet } from 'react-native';
+import { Animated, View, StyleSheet } from 'react-native';
 import { colors } from '@/constants/theme';
 
 interface WaveformProps {
   active: boolean;
-  amplitudes?: number[];
+  bars: Animated.Value[];
 }
 
-export default function Waveform({ active, amplitudes = [] }: WaveformProps) {
+export default function Waveform({ active, bars }: WaveformProps) {
   return (
     <View style={styles.container}>
-      {Array.from({ length: 32 }).map((_, i) => (
-        <View
+      {bars.map((height, i) => (
+        <Animated.View
           key={i}
-          style={[
-            styles.bar,
-            { height: amplitudes[i] ? amplitudes[i] * 40 + 4 : 4 },
-            active && styles.barActive,
-          ]}
+          style={[styles.bar, { height }, active && styles.barActive]}
         />
       ))}
     </View>

@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Animated,
 } from 'react-native';
 import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
@@ -43,7 +44,10 @@ export default function RecordScreen() {
   const [selectedLang, setSelectedLang] = useState('EN');
   const [status, setStatus] = useState<Status>('ready');
   const [timer, setTimer] = useState(0);
-  const [amplitudes, setAmplitudes] = useState<number[]>(Array(WAVEFORM_BARS).fill(0));
+  const animatedBars = useRef<Animated.Value[]>(
+    Array.from({ length: WAVEFORM_BARS }, () => new Animated.Value(4))
+  );
+  const rawAmplitudes = useRef<number[]>(Array(WAVEFORM_BARS).fill(0));
   const [entryCount, setEntryCount] = useState(0);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
@@ -95,10 +99,13 @@ export default function RecordScreen() {
         if (!s.isRecording) return;
         const metering = s.metering ?? -160;
         const normalized = Math.max(0, Math.min(1, (metering + 60) / 60));
-        setAmplitudes((prev) => [...prev.slice(1), normalized]);
+        rawAmplitudes.current = [...rawAmplitudes.current.slice(1), normalized];
+        rawAmplitudes.current.forEach((val, i) => {
+          animatedBars.current[i].setValue(val * 44 + 4);
+        });
       });
 
-      recording.setProgressUpdateInterval(80);
+      recording.setProgressUpdateInterval(50);
       await recording.startAsync();
       recordingRef.current = recording;
       setStatus('recording');
@@ -140,7 +147,8 @@ export default function RecordScreen() {
       });
 
       setEntryCount((c) => c + 1);
-      setAmplitudes(Array(WAVEFORM_BARS).fill(0));
+      rawAmplitudes.current = Array(WAVEFORM_BARS).fill(0);
+      animatedBars.current.forEach((v) => v.setValue(4));
       setTimer(0);
       setStatus('ready');
 
@@ -189,7 +197,7 @@ export default function RecordScreen() {
         </View>
 
         <View style={styles.waveformContainer}>
-          <Waveform active={status === 'recording'} amplitudes={amplitudes} />
+          <Waveform active={status === 'recording'} bars={animatedBars.current} />
         </View>
 
         <View style={styles.transcriptBox}>

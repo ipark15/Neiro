@@ -24,8 +24,8 @@ const LANGUAGES = [
   { code: 'DE', label: 'Deutsch' },
 ];
 
-const INNER_RADIUS = 52;
-const OUTER_RADIUS = 80;
+const INNER_RADIUS = 40;
+const OUTER_RADIUS = 62;
 
 const INNER_DOTS = [
   { angle: 0, color: colors.lang.EN },
@@ -119,75 +119,81 @@ export default function LandingScreen() {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.topBar}>
-        <Text style={styles.topLabel}>A VOICE DIARY</Text>
-        <Text style={styles.topBrand}>
-          Neiro <Text style={styles.topKanji}>音色</Text>
-        </Text>
-      </View>
-
-      <View style={styles.hero}>
-        <Orbital />
-
-        <Text style={styles.headline}>Speak your day,{'\n'}
-          <Text style={styles.headlineItalic}>in any tongue.</Text>
-        </Text>
-        <Text style={styles.subheadline}>
-          A voice journal for people who think in{'\n'}more than one language. Press a button,{'\n'}talk to your day.
-        </Text>
-      </View>
-
-      <View style={styles.langBox}>
-        <View style={styles.langHeader}>
-          <Text style={styles.langLabel}>LANGUAGES</Text>
-          <Text style={styles.langCount}>{LANGUAGES.length} / {LANGUAGES.length}</Text>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.container}>
+        <View style={styles.topBar}>
+          <Text style={styles.topLabel}>A VOICE DIARY</Text>
+          <Text style={styles.topBrand}>
+            Neiro <Text style={styles.topKanji}>音色</Text>
+          </Text>
         </View>
-        <View style={styles.langGrid}>
-          {LANGUAGES.map(({ code, label }) => (
-            <View key={code} style={styles.langChip}>
-              <View style={[styles.langDot, { backgroundColor: colors.lang[code] }]} />
-              <Text style={styles.langChipText}>{label}</Text>
-            </View>
-          ))}
+
+        <View style={styles.hero}>
+          <Orbital />
+
+          <Text style={styles.headline}>Speak your day,{'\n'}
+            <Text style={styles.headlineItalic}>in any tongue.</Text>
+          </Text>
+          <Text style={styles.subheadline}>
+            A voice journal for people who think in{'\n'}more than one language. Press a button,{'\n'}talk to your day.
+          </Text>
         </View>
-      </View>
 
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={() => router.push('/(auth)/login?mode=signup')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.primaryBtnText}>Begin journaling  →</Text>
-        </TouchableOpacity>
+        <View style={styles.langBox}>
+          <View style={styles.langHeader}>
+            <Text style={styles.langLabel}>LANGUAGES</Text>
+            <Text style={styles.langCount}>{LANGUAGES.length} / {LANGUAGES.length}</Text>
+          </View>
+          <View style={styles.langGrid}>
+            {LANGUAGES.map(({ code, label }) => (
+              <View key={code} style={styles.langChip}>
+                <View style={[styles.langDot, { backgroundColor: colors.lang[code] }]} />
+                <Text style={styles.langChipText}>{label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
 
-        <TouchableOpacity
-          style={styles.secondaryBtn}
-          onPress={() => router.push('/(auth)/login?mode=signin')}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.secondaryBtnText}>I already have an account</Text>
-        </TouchableOpacity>
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={() => router.push('/(auth)/login?mode=signup')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.primaryBtnText}>Begin journaling  →</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.syncNote}>↻  Kept across all your devices</Text>
+          <TouchableOpacity
+            style={styles.secondaryBtn}
+            onPress={() => router.push('/(auth)/login?mode=signin')}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.secondaryBtnText}>I already have an account</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.syncNote}>↻  Kept across all your devices</Text>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  container: {
+    flex: 1,
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+    justifyContent: 'space-between',
   },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: spacing.sm,
-    marginBottom: spacing.lg,
   },
   topLabel: {
     fontFamily: fonts.mono,
@@ -207,8 +213,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: 'center',
-    gap: spacing.lg,
-    marginBottom: spacing.xl,
+    gap: spacing.sm,
   },
   orbital: {
     width: OUTER_RADIUS * 2 + 20,
@@ -235,9 +240,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   center: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: colors.terracotta,
   },
   headline: {
@@ -263,8 +268,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.xl,
+    padding: spacing.sm + 4,
     backgroundColor: colors.bgCard,
   },
   langHeader: {
@@ -309,14 +313,14 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   actions: {
-    gap: spacing.md,
+    gap: spacing.sm,
     alignItems: 'center',
   },
   primaryBtn: {
     width: '100%',
     backgroundColor: colors.bgDark,
     borderRadius: radius.full,
-    paddingVertical: spacing.md + 2,
+    paddingVertical: spacing.sm + 6,
     alignItems: 'center',
   },
   primaryBtnText: {
@@ -330,7 +334,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingVertical: spacing.md + 2,
+    paddingVertical: spacing.sm + 6,
     alignItems: 'center',
   },
   secondaryBtnText: {
