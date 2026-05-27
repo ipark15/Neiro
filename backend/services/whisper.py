@@ -1,4 +1,3 @@
-import io
 import os
 import math
 from groq import AsyncGroq
@@ -15,15 +14,26 @@ LANG_MAP = {
 }
 
 
+MIME_MAP = {
+    ".m4a": "audio/mp4",
+    ".mp4": "audio/mp4",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".webm": "audio/webm",
+    ".ogg": "audio/ogg",
+    ".flac": "audio/flac",
+}
+
+
 async def transcribe(audio_bytes: bytes, filename: str) -> dict:
     client = AsyncGroq(api_key=os.environ["GROQ_API_KEY"])
 
-    audio_file = io.BytesIO(audio_bytes)
-    audio_file.name = filename
+    ext = os.path.splitext(filename)[1].lower()
+    mime_type = MIME_MAP.get(ext, "audio/webm")
 
     result = await client.audio.transcriptions.create(
         model="whisper-large-v3",
-        file=audio_file,
+        file=(filename, audio_bytes, mime_type),
         response_format="verbose_json",
     )
 

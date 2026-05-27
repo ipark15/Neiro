@@ -20,11 +20,18 @@ async def create_entry(
     duration_seconds: int | None = Form(None),
 ):
     audio_bytes = await file.read()
-    filename = file.filename or "recording.m4a"
+    filename = file.filename or "recording.webm"
 
-    audio_url = storage.upload_audio(audio_bytes, filename)
+    try:
+        audio_url = storage.upload_audio(audio_bytes, filename)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Storage upload failed: {e}")
 
-    result = await whisper.transcribe(audio_bytes, filename)
+    try:
+        result = await whisper.transcribe(audio_bytes, filename)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {e}")
+
     # Use client-reported duration if Whisper didn't produce one
     final_duration = result["duration_seconds"] or duration_seconds
 
@@ -37,9 +44,14 @@ async def create_entry(
         "duration_seconds": final_duration,
     }
 
-    response = db().table("entries").insert(row).execute()
-    if not response.data:
-        raise HTTPException(status_code=500, detail="Failed to save entry.")
+    try:
+        response = db().table("entries").insert(row).execute()
+        if not response.data:
+            raise HTTPException(status_code=500, detail="Database insert returned no data.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database insert failed: {e}")
 
     return Entry(**response.data[0])
 
