@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { useAudioPlayer, useAudioPlayerStatus, AudioModule } from 'expo-audio';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -18,7 +18,7 @@ import { colors, fonts, fontSize, spacing, radius, letterSpacing } from '@/const
 // ─── Date helpers ────────────────────────────────────────────────────────────
 
 function toDateKey(date: Date): string {
-  return date.toISOString().split('T')[0];
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function getDaysInMonth(year: number, month: number): number {
@@ -64,65 +64,30 @@ const LANG_NAMES: Record<string, string> = {
 // changes we unload the previous sound to free memory and avoid overlap.
 
 function AudioPlayer({ uri, duration }: { uri: string; duration: number | null }) {
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [positionMs, setPositionMs] = useState(0);
-  const [durationMs, setDurationMs] = useState((duration ?? 0) * 1000);
-  const [loading, setLoading] = useState(false);
+  const player = useAudioPlayer(uri);
+  const status = useAudioPlayerStatus(player);
 
-  useEffect(() => {
-    return () => {
-      // Unload sound when component unmounts or uri changes
-      soundRef.current?.unloadAsync();
-      soundRef.current = null;
-    };
-  }, [uri]);
-
-  async function togglePlay() {
-    if (loading) return;
-
-    if (!soundRef.current) {
-      setLoading(true);
-      try {
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-        const { sound } = await Audio.Sound.createAsync(
-          { uri },
-          { shouldPlay: true },
-          (status) => {
-            if (!status.isLoaded) return;
-            setPositionMs(status.positionMillis);
-            setDurationMs(status.durationMillis ?? durationMs);
-            setPlaying(status.isPlaying);
-            if (status.didJustFinish) {
-              setPlaying(false);
-              setPositionMs(0);
-            }
-          }
-        );
-        soundRef.current = sound;
-        setPlaying(true);
-      } catch {
-        // silently fail — audio URL may not yet be accessible
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    if (playing) {
-      await soundRef.current.pauseAsync();
-    } else {
-      await soundRef.current.playAsync();
-    }
-  }
-
+  const playing = status.playing;
+  const positionMs = status.currentTime * 1000;
+  const totalDuration = status.duration > 0 ? status.duration : (duration ?? 0);
+  const durationMs = totalDuration * 1000;
   const progress = durationMs > 0 ? positionMs / durationMs : 0;
   const elapsed = Math.floor(positionMs / 1000);
+
+  async function togglePlay() {
+    await AudioModule.setAudioModeAsync({ playsInSilentModeIOS: true });
+    if (playing) {
+      player.pause();
+    } else {
+      if (status.didJustFinish) player.seekTo(0);
+      player.play();
+    }
+  }
 
   return (
     <View style={playerStyles.row}>
       <TouchableOpacity style={playerStyles.playBtn} onPress={togglePlay} activeOpacity={0.8}>
-        {loading ? (
+        {status.isLoading ? (
           <ActivityIndicator color={colors.bgCard} size="small" />
         ) : (
           <Text style={playerStyles.playIcon}>{playing ? '❚❚' : '▶'}</Text>
@@ -353,6 +318,7 @@ export default function CalendarScreen() {
               </View>
 
               <AudioPlayer
+                key={selectedEntry.id}
                 uri={selectedEntry.audio_url}
                 duration={selectedEntry.duration_seconds}
               />

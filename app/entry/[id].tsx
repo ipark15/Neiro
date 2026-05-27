@@ -1,4 +1,3 @@
-import { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +8,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Audio } from 'expo-av';
+import { useAudioPlayer, useAudioPlayerStatus, AudioModule } from 'expo-audio';
 import type { Entry } from '@/lib/api';
 import { colors, fonts, fontSize, spacing, radius, letterSpacing } from '@/constants/theme';
 
@@ -31,52 +30,29 @@ function formatDuration(seconds: number | null): string {
 }
 
 function AudioPlayer({ uri, duration }: { uri: string; duration: number | null }) {
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [positionMs, setPositionMs] = useState(0);
-  const [durationMs, setDurationMs] = useState((duration ?? 0) * 1000);
-  const [loading, setLoading] = useState(false);
+  const player = useAudioPlayer(uri);
+  const status = useAudioPlayerStatus(player);
 
-  useEffect(() => {
-    return () => { soundRef.current?.unloadAsync(); };
-  }, [uri]);
+  const playing = status.playing;
+  const positionMs = status.currentTime * 1000;
+  const totalDuration = status.duration > 0 ? status.duration : (duration ?? 0);
+  const durationMs = totalDuration * 1000;
+  const progress = durationMs > 0 ? positionMs / durationMs : 0;
 
   async function togglePlay() {
-    if (loading) return;
-    if (!soundRef.current) {
-      setLoading(true);
-      try {
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-        const { sound } = await Audio.Sound.createAsync(
-          { uri },
-          { shouldPlay: true },
-          (status) => {
-            if (!status.isLoaded) return;
-            setPositionMs(status.positionMillis);
-            setDurationMs(status.durationMillis ?? durationMs);
-            setPlaying(status.isPlaying);
-            if (status.didJustFinish) { setPlaying(false); setPositionMs(0); }
-          }
-        );
-        soundRef.current = sound;
-        setPlaying(true);
-      } catch {
-        // audio URL not yet accessible
-      } finally {
-        setLoading(false);
-      }
-      return;
+    await AudioModule.setAudioModeAsync({ playsInSilentModeIOS: true });
+    if (playing) {
+      player.pause();
+    } else {
+      if (status.didJustFinish) player.seekTo(0);
+      player.play();
     }
-    if (playing) await soundRef.current.pauseAsync();
-    else await soundRef.current.playAsync();
   }
-
-  const progress = durationMs > 0 ? positionMs / durationMs : 0;
 
   return (
     <View style={playerStyles.container}>
       <TouchableOpacity style={playerStyles.playBtn} onPress={togglePlay} activeOpacity={0.8}>
-        {loading
+        {status.isLoading
           ? <ActivityIndicator color={colors.bgCard} size="small" />
           : <Text style={playerStyles.playIcon}>{playing ? '❚❚' : '▶'}</Text>
         }
@@ -88,6 +64,7 @@ function AudioPlayer({ uri, duration }: { uri: string; duration: number | null }
       <Text style={playerStyles.time}>
         {playing ? formatDuration(Math.floor(positionMs / 1000)) : formatDuration(duration)}
       </Text>
+
     </View>
   );
 }

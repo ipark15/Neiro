@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { colors, fonts, fontSize, letterSpacing } from '@/constants/theme';
 
 function RecordIcon({ focused }: { focused: boolean }) {
@@ -57,8 +57,8 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: colors.bgCard,
     borderTopWidth: 0,
-    height: 72,
-    paddingBottom: 16,
+    height: Platform.OS === 'web' ? 64 : 72,
+    paddingBottom: Platform.OS === 'web' ? 0 : 16,
     paddingTop: 8,
     shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: -4 },

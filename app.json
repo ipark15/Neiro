@@ -37,7 +37,8 @@
         {
           "microphonePermission": "Neiro needs access to your microphone to record voice diary entries."
         }
-      ]
+      ],
+      "expo-audio"
     ]
   }
 }

@@ -9,7 +9,7 @@ import {
   Alert,
   Animated,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets } from 'expo-audio';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -50,9 +50,20 @@ export default function RecordScreen() {
   const rawAmplitudes = useRef<number[]>(Array(WAVEFORM_BARS).fill(0));
   const [entryCount, setEntryCount] = useState(0);
 
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
+  const recorderState = useAudioRecorderState(recorder, 50);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { day, date } = formatDate();
+
+  useEffect(() => {
+    if (!recorderState.isRecording) return;
+    const metering = recorderState.metering ?? -160;
+    const normalized = Math.max(0, Math.min(1, (metering + 60) / 60));
+    rawAmplitudes.current = [...rawAmplitudes.current.slice(1), normalized];
+    rawAmplitudes.current.forEach((val, i) => {
+      animatedBars.current[i].setValue(val * 44 + 4);
+    });
+  }, [recorderState.metering, recorderState.isRecording]);
 
   useEffect(() => {
     loadEntryCount();
@@ -78,36 +89,15 @@ export default function RecordScreen() {
 
   const startRecording = useCallback(async () => {
     try {
-      const { granted } = await Audio.requestPermissionsAsync();
+      const { granted } = await AudioModule.requestRecordingPermissionsAsync();
       if (!granted) {
         Alert.alert('Permission needed', 'Microphone access is required to record entries.');
         return;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync({
-        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        isMeteringEnabled: true,
-      });
-
-      recording.setOnRecordingStatusUpdate((s) => {
-        if (!s.isRecording) return;
-        const metering = s.metering ?? -160;
-        const normalized = Math.max(0, Math.min(1, (metering + 60) / 60));
-        rawAmplitudes.current = [...rawAmplitudes.current.slice(1), normalized];
-        rawAmplitudes.current.forEach((val, i) => {
-          animatedBars.current[i].setValue(val * 44 + 4);
-        });
-      });
-
-      recording.setProgressUpdateInterval(50);
-      await recording.startAsync();
-      recordingRef.current = recording;
+      await AudioModule.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       setStatus('recording');
       setTimer(0);
 
@@ -117,27 +107,23 @@ export default function RecordScreen() {
     } catch (err) {
       Alert.alert('Error', 'Could not start recording.');
     }
-  }, []);
+  }, [recorder]);
 
   const stopRecording = useCallback(async () => {
     stopTimer();
-    const recording = recordingRef.current;
-    if (!recording) return;
-
     try {
       setStatus('processing');
-      await recording.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      await recorder.stop();
+      await AudioModule.setAudioModeAsync({ allowsRecordingIOS: false });
 
-      const uri = recording.getURI();
-      recordingRef.current = null;
-
+      const uri = recorder.uri;
       if (!uri) throw new Error('No recording URI');
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not signed in');
 
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
       await uploadEntry({
         file: { uri, name: 'recording.m4a', type: 'audio/m4a' },
@@ -158,7 +144,7 @@ export default function RecordScreen() {
       Alert.alert('Error', message);
       setStatus('ready');
     }
-  }, [stopTimer, timer, router]);
+  }, [stopTimer, timer, router, recorder]);
 
   function handleToggle() {
     if (status === 'ready') startRecording();
