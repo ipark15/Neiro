@@ -16,13 +16,21 @@ export interface Entry {
 }
 
 export async function uploadEntry(params: {
-  file: { uri: string; name: string; type: string };
+  file: { uri: string; name: string; type: string } | Blob;
   user_id: string;
   date: string;
   duration_seconds?: number;
 }): Promise<Entry> {
   const form = new FormData();
-  form.append('file', params.file as unknown as Blob);
+
+  if (params.file instanceof Blob) {
+    // Web: file is a raw Blob from MediaRecorder
+    form.append('file', params.file, 'recording.webm');
+  } else {
+    // Native: file is a { uri, name, type } object
+    form.append('file', params.file as unknown as Blob);
+  }
+
   form.append('user_id', params.user_id);
   form.append('date', params.date);
   if (params.duration_seconds != null) {

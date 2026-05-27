@@ -8,8 +8,8 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Platform,
 } from 'react-native';
-import { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets } from 'expo-audio';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -39,7 +39,154 @@ function formatVolume(count: number): string {
   return `VOL.${count.toString().padStart(3, '0')}`;
 }
 
+// ─── Platform-split: NativeRecordScreen loads expo-audio hooks safely ─────────
+function NativeRecordScreen() {
+  const { useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets } = require('expo-audio');
+  return <RecordScreenNative
+    useAudioRecorder={useAudioRecorder}
+    useAudioRecorderState={useAudioRecorderState}
+    AudioModule={AudioModule}
+    RecordingPresets={RecordingPresets}
+  />;
+}
+
 export default function RecordScreen() {
+  return Platform.OS === 'web' ? <RecordScreenWeb /> : <NativeRecordScreen />;
+}
+
+// ─── Web record screen ────────────────────────────────────────────────────────
+function RecordScreenWeb() {
+  const router = useRouter();
+  const [selectedLang, setSelectedLang] = useState('EN');
+  const [status, setStatus] = useState<Status>('ready');
+  const [timer, setTimer] = useState(0);
+  const animatedBars = useRef<Animated.Value[]>(
+    Array.from({ length: WAVEFORM_BARS }, () => new Animated.Value(4))
+  );
+  const rawAmplitudes = useRef<number[]>(Array(WAVEFORM_BARS).fill(0));
+  const [entryCount, setEntryCount] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { day, date } = formatDate();
+
+  useEffect(() => { loadEntryCount(); }, []);
+
+  async function loadEntryCount() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const entries = await getEntries(user.id);
+      setEntryCount(entries.length);
+    } catch {}
+  }
+
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      mediaRecorderRef.current = mr;
+      audioChunksRef.current = [];
+
+      const animInterval = setInterval(() => {
+        rawAmplitudes.current = rawAmplitudes.current.map(() => Math.random() * 0.8);
+        rawAmplitudes.current.forEach((val, i) => animatedBars.current[i].setValue(val * 44 + 4));
+      }, 100);
+      (mr as any)._animInterval = animInterval;
+
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.start(100);
+      setStatus('recording');
+      setTimer(0);
+      timerRef.current = setInterval(() => setTimer((t) => t + 1), 1000);
+    } catch {
+      alert('Microphone access is required to record entries.');
+    }
+  }, []);
+
+  const stopRecording = useCallback((currentTimer: number) => {
+    stopTimer();
+    setStatus('processing');
+    const mr = mediaRecorderRef.current;
+    if (!mr) return;
+    clearInterval((mr as any)._animInterval);
+    mr.onstop = async () => {
+      try {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        mr.stream.getTracks().forEach((t) => t.stop());
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Not signed in');
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        await uploadEntry({ file: blob, user_id: user.id, date: today, duration_seconds: currentTimer });
+        setEntryCount((c) => c + 1);
+        rawAmplitudes.current = Array(WAVEFORM_BARS).fill(0);
+        animatedBars.current.forEach((v) => v.setValue(4));
+        setTimer(0);
+        setStatus('ready');
+        router.replace('/(tabs)/calendar');
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Failed to save entry.');
+        setStatus('ready');
+      }
+    };
+    mr.stop();
+  }, [stopTimer, router]);
+
+  function handleToggle() {
+    if (status === 'ready') startRecording();
+    else if (status === 'recording') stopRecording(timer);
+  }
+
+  const statusLabel = status === 'ready' ? 'READY' : status === 'recording' ? 'RECORDING' : 'SAVING…';
+  const statusColor = status === 'recording' ? colors.terracotta : colors.textMuted;
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerDay}>{day} · {date}</Text>
+            <Text style={styles.headerTitle}>Neiro <Text style={styles.headerKanji}>音色</Text></Text>
+          </View>
+          <Text style={styles.volLabel}>{formatVolume(entryCount)}</Text>
+        </View>
+        <Text style={styles.sectionLabel}>TODAY, SPEAKING IN</Text>
+        <LangSelector selected={selectedLang} onSelect={setSelectedLang} />
+        <View style={styles.meterRow}>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+          </View>
+          <Text style={styles.timer}>{formatTimer(timer)}</Text>
+        </View>
+        <View style={styles.waveformContainer}>
+          <Waveform active={status === 'recording'} bars={animatedBars.current} />
+        </View>
+        <View style={styles.transcriptBox}>
+          <Text style={styles.transcriptLabel}>{selectedLang} TRANSCRIPT</Text>
+          <Text style={styles.transcriptPlaceholder}>
+            {status === 'ready' ? `Press the dot below. Speak your day in ${selectedLang === 'EN' ? 'English' : selectedLang}.`
+              : status === 'recording' ? 'Listening…' : 'Transcribing your entry…'}
+          </Text>
+        </View>
+      </ScrollView>
+      <View style={styles.recordArea}>
+        <TouchableOpacity style={[styles.recordBtn, status === 'recording' && styles.recordBtnActive]} onPress={handleToggle} disabled={status === 'processing'} activeOpacity={0.8}>
+          {status === 'processing' ? <ActivityIndicator color={colors.terracotta} /> : <View style={[styles.recordDot, status === 'recording' && styles.recordDotStop]} />}
+        </TouchableOpacity>
+        <Text style={styles.recordHint}>{status === 'ready' ? 'tap to begin' : status === 'recording' ? 'tap to stop' : ''}</Text>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+// ─── Native record screen ─────────────────────────────────────────────────────
+function RecordScreenNative({ useAudioRecorder, useAudioRecorderState, AudioModule, RecordingPresets }: any) {
   const router = useRouter();
   const [selectedLang, setSelectedLang] = useState('EN');
   const [status, setStatus] = useState<Status>('ready');
@@ -75,9 +222,7 @@ export default function RecordScreen() {
       if (!user) return;
       const entries = await getEntries(user.id);
       setEntryCount(entries.length);
-    } catch {
-      // non-critical, leave at 0
-    }
+    } catch {}
   }
 
   const stopTimer = useCallback(() => {
@@ -94,17 +239,13 @@ export default function RecordScreen() {
         Alert.alert('Permission needed', 'Microphone access is required to record entries.');
         return;
       }
-
       await AudioModule.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
       setStatus('recording');
       setTimer(0);
-
-      timerRef.current = setInterval(() => {
-        setTimer((t) => t + 1);
-      }, 1000);
-    } catch (err) {
+      timerRef.current = setInterval(() => setTimer((t) => t + 1), 1000);
+    } catch {
       Alert.alert('Error', 'Could not start recording.');
     }
   }, [recorder]);
@@ -115,33 +256,21 @@ export default function RecordScreen() {
       setStatus('processing');
       await recorder.stop();
       await AudioModule.setAudioModeAsync({ allowsRecordingIOS: false });
-
       const uri = recorder.uri;
       if (!uri) throw new Error('No recording URI');
-
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not signed in');
-
       const now = new Date();
       const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-      await uploadEntry({
-        file: { uri, name: 'recording.m4a', type: 'audio/m4a' },
-        user_id: user.id,
-        date: today,
-        duration_seconds: timer,
-      });
-
+      await uploadEntry({ file: { uri, name: 'recording.m4a', type: 'audio/m4a' }, user_id: user.id, date: today, duration_seconds: timer });
       setEntryCount((c) => c + 1);
       rawAmplitudes.current = Array(WAVEFORM_BARS).fill(0);
       animatedBars.current.forEach((v) => v.setValue(4));
       setTimer(0);
       setStatus('ready');
-
       router.replace('/(tabs)/calendar');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save entry.';
-      Alert.alert('Error', message);
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save entry.');
       setStatus('ready');
     }
   }, [stopTimer, timer, router, recorder]);
@@ -156,24 +285,16 @@ export default function RecordScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <View>
             <Text style={styles.headerDay}>{day} · {date}</Text>
-            <Text style={styles.headerTitle}>
-              Neiro <Text style={styles.headerKanji}>音色</Text>
-            </Text>
+            <Text style={styles.headerTitle}>Neiro <Text style={styles.headerKanji}>音色</Text></Text>
           </View>
           <Text style={styles.volLabel}>{formatVolume(entryCount)}</Text>
         </View>
-
         <Text style={styles.sectionLabel}>TODAY, SPEAKING IN</Text>
         <LangSelector selected={selectedLang} onSelect={setSelectedLang} />
-
         <View style={styles.meterRow}>
           <View style={styles.statusRow}>
             <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
@@ -181,39 +302,22 @@ export default function RecordScreen() {
           </View>
           <Text style={styles.timer}>{formatTimer(timer)}</Text>
         </View>
-
         <View style={styles.waveformContainer}>
           <Waveform active={status === 'recording'} bars={animatedBars.current} />
         </View>
-
         <View style={styles.transcriptBox}>
           <Text style={styles.transcriptLabel}>{selectedLang} TRANSCRIPT</Text>
           <Text style={styles.transcriptPlaceholder}>
-            {status === 'ready'
-              ? `Press the dot below. Speak your day in ${selectedLang === 'EN' ? 'English' : selectedLang}.`
-              : status === 'recording'
-              ? 'Listening…'
-              : 'Transcribing your entry…'}
+            {status === 'ready' ? `Press the dot below. Speak your day in ${selectedLang === 'EN' ? 'English' : selectedLang}.`
+              : status === 'recording' ? 'Listening…' : 'Transcribing your entry…'}
           </Text>
         </View>
       </ScrollView>
-
       <View style={styles.recordArea}>
-        <TouchableOpacity
-          style={[styles.recordBtn, status === 'recording' && styles.recordBtnActive]}
-          onPress={handleToggle}
-          disabled={status === 'processing'}
-          activeOpacity={0.8}
-        >
-          {status === 'processing' ? (
-            <ActivityIndicator color={colors.terracotta} />
-          ) : (
-            <View style={[styles.recordDot, status === 'recording' && styles.recordDotStop]} />
-          )}
+        <TouchableOpacity style={[styles.recordBtn, status === 'recording' && styles.recordBtnActive]} onPress={handleToggle} disabled={status === 'processing'} activeOpacity={0.8}>
+          {status === 'processing' ? <ActivityIndicator color={colors.terracotta} /> : <View style={[styles.recordDot, status === 'recording' && styles.recordDotStop]} />}
         </TouchableOpacity>
-        <Text style={styles.recordHint}>
-          {status === 'ready' ? 'tap to begin' : status === 'recording' ? 'tap to stop' : ''}
-        </Text>
+        <Text style={styles.recordHint}>{status === 'ready' ? 'tap to begin' : status === 'recording' ? 'tap to stop' : ''}</Text>
       </View>
     </SafeAreaView>
   );
