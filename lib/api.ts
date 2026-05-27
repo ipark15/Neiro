@@ -37,9 +37,10 @@ export async function uploadEntry(params: {
     form.append('duration_seconds', String(params.duration_seconds));
   }
 
-  const { data } = await api.post<Entry>('/entries', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  // Don't set Content-Type manually — the browser/axios must set it with the
+  // multipart boundary (e.g. multipart/form-data; boundary=----xyz).
+  // Overriding it strips the boundary and the server receives an empty file.
+  const { data } = await api.post<Entry>('/entries', form);
   return data;
 }
 
