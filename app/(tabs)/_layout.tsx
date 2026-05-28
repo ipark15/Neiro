@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, fontSize, letterSpacing } from '@/constants/theme';
 
 function RecordIcon({ focused }: { focused: boolean }) {
@@ -25,11 +26,12 @@ function CalendarIcon({ focused }: { focused: boolean }) {
 }
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }],
         tabBarActiveTintColor: colors.terracotta,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarLabelStyle: styles.tabLabel,
@@ -58,7 +60,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard,
     borderTopWidth: 0,
     height: Platform.OS === 'web' ? 64 : 72,
-    paddingBottom: Platform.OS === 'web' ? 0 : 16,
     paddingTop: 8,
     shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: -4 },
