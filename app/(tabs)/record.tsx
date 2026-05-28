@@ -88,7 +88,10 @@ function RecordScreenWeb() {
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+      // iOS Safari only supports audio/mp4 — pick the best supported type
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+        .find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
+      const mr = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mr;
       audioChunksRef.current = [];
 
@@ -116,13 +119,16 @@ function RecordScreenWeb() {
     clearInterval((mr as any)._animInterval);
     mr.onstop = async () => {
       try {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        // Use the actual MIME type the browser chose (e.g. audio/mp4 on iOS Safari)
+        const baseMime = (mr.mimeType || 'audio/webm').split(';')[0];
+        const ext = baseMime === 'audio/mp4' ? 'm4a' : (baseMime.split('/')[1] ?? 'webm');
+        const blob = new Blob(audioChunksRef.current, { type: baseMime });
         mr.stream.getTracks().forEach((t) => t.stop());
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Not signed in');
         const now = new Date();
         const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        await uploadEntry({ file: blob, user_id: user.id, date: today, duration_seconds: currentTimer });
+        await uploadEntry({ file: blob, filename: `recording.${ext}`, user_id: user.id, date: today, duration_seconds: currentTimer });
         setEntryCount((c) => c + 1);
         rawAmplitudes.current = Array(WAVEFORM_BARS).fill(0);
         animatedBars.current.forEach((v) => v.setValue(4));

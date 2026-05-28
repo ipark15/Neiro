@@ -17,6 +17,7 @@ export interface Entry {
 
 export async function uploadEntry(params: {
   file: { uri: string; name: string; type: string } | Blob;
+  filename?: string;
   user_id: string;
   date: string;
   duration_seconds?: number;
@@ -25,7 +26,7 @@ export async function uploadEntry(params: {
 
   if (params.file instanceof Blob) {
     // Web: file is a raw Blob from MediaRecorder
-    form.append('file', params.file, 'recording.webm');
+    form.append('file', params.file, params.filename ?? 'recording.webm');
   } else {
     // Native: file is a { uri, name, type } object
     form.append('file', params.file as unknown as Blob);
