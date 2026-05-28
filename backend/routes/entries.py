@@ -64,6 +64,7 @@ def get_entries(user_id: str):
         .select("*")
         .eq("user_id", user_id)
         .order("date", desc=True)
+        .order("created_at", desc=False)
         .execute()
     )
     return [Entry(**row) for row in response.data]

@@ -1,6 +1,6 @@
 // Web version — uses HTML Audio API (expo-audio has no web support)
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { colors, fonts, fontSize, spacing, radius } from '@/constants/theme';
 
 function formatDuration(seconds: number | null): string {
@@ -13,11 +13,13 @@ function formatDuration(seconds: number | null): string {
 export function AudioPlayer({ uri, duration }: { uri: string; duration: number | null }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     const audio = new Audio(uri);
+    audio.preload = 'metadata';
     audioRef.current = audio;
 
     const onTimeUpdate = () => {
@@ -28,24 +30,33 @@ export function AudioPlayer({ uri, duration }: { uri: string; duration: number |
 
     const onEnded = () => {
       setPlaying(false);
+      setIsLoading(false);
       setProgress(0);
       setElapsed(0);
     };
 
+    // Fires when audio stalls mid-playback and is buffering
+    const onWaiting = () => setIsLoading(true);
+    const onPlaying = () => setIsLoading(false);
+
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('ended', onEnded);
+    audio.addEventListener('waiting', onWaiting);
+    audio.addEventListener('playing', onPlaying);
 
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('waiting', onWaiting);
+      audio.removeEventListener('playing', onPlaying);
       audio.pause();
       audio.src = '';
     };
   }, [uri]);
 
-  function togglePlay() {
+  async function togglePlay() {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || isLoading) return;
     if (playing) {
       audio.pause();
       setPlaying(false);
@@ -55,15 +66,25 @@ export function AudioPlayer({ uri, duration }: { uri: string; duration: number |
         setProgress(0);
         setElapsed(0);
       }
-      audio.play();
-      setPlaying(true);
+      setIsLoading(true);
+      try {
+        await audio.play();
+        setPlaying(true);
+      } catch (err) {
+        console.error('Audio play failed:', err);
+        setIsLoading(false);
+      }
     }
   }
 
   return (
     <View style={styles.row}>
       <TouchableOpacity style={styles.playBtn} onPress={togglePlay} activeOpacity={0.8}>
-        <Text style={styles.playIcon}>{playing ? '❚❚' : '▶'}</Text>
+        {isLoading ? (
+          <ActivityIndicator color={colors.bgCard} size="small" />
+        ) : (
+          <Text style={styles.playIcon}>{playing ? '❚❚' : '▶'}</Text>
+        )}
       </TouchableOpacity>
       <View style={styles.track}>
         <View style={[styles.fill, { flex: progress }]} />
