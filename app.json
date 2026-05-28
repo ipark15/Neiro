@@ -27,7 +27,15 @@
       "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "Neiro",
+      "shortName": "Neiro",
+      "display": "standalone",
+      "themeColor": "#EDE8DF",
+      "backgroundColor": "#EDE8DF",
+      "startUrl": "/"
     },
     "plugins": [
       "expo-router",
