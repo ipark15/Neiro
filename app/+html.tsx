@@ -8,7 +8,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
 
         {/* iOS PWA: makes "Add to Home Screen" launch as a full-screen standalone app */}
         <meta name="apple-mobile-web-app-capable" content="yes" />

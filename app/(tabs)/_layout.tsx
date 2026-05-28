@@ -34,7 +34,7 @@ export default function TabLayout() {
         tabBarStyle: [
           styles.tabBar,
           {
-            paddingBottom: Math.max(insets.bottom, 8),
+            paddingBottom: insets.bottom,
             height: (Platform.OS === 'web' ? 64 : 72) + insets.bottom,
           },
         ],
