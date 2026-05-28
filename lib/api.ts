@@ -55,6 +55,11 @@ export async function getEntry(user_id: string, date: string): Promise<Entry> {
   return data;
 }
 
+export async function updateEntry(entry_id: string, transcript: string): Promise<Entry> {
+  const { data } = await api.patch<Entry>(`/entries/${entry_id}`, { transcript });
+  return data;
+}
+
 export async function deleteEntry(entry_id: string): Promise<void> {
   await api.delete(`/entries/${entry_id}`);
 }

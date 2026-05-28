@@ -1,15 +1,20 @@
+import { useState, useRef } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Platform,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAudioPlayer, useAudioPlayerStatus, AudioModule } from 'expo-audio';
 import type { Entry } from '@/lib/api';
+import { updateEntry } from '@/lib/api';
 import { colors, fonts, fontSize, spacing, radius, letterSpacing } from '@/constants/theme';
 
 const LANG_NAMES: Record<string, string> = {
@@ -110,7 +115,39 @@ export default function EntryDetailScreen() {
   const { data } = useLocalSearchParams<{ data: string }>();
   const entry: Entry = JSON.parse(data);
 
+  const [transcript, setTranscript] = useState(entry.transcript ?? '');
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+
   const langColor = colors.lang[entry.language] ?? colors.terracotta;
+
+  function startEdit() {
+    setDraft(transcript);
+    setIsEditing(true);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }
+
+  function cancelEdit() {
+    setIsEditing(false);
+    setDraft('');
+  }
+
+  async function saveEdit() {
+    setSaving(true);
+    try {
+      await updateEntry(entry.id, draft);
+      setTranscript(draft);
+      setIsEditing(false);
+    } catch {
+      const msg = 'Could not save changes. Check your connection and try again.';
+      if (Platform.OS === 'web') alert(msg);
+      else Alert.alert('Error', msg);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -126,16 +163,13 @@ export default function EntryDetailScreen() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Date + language */}
         <View style={styles.metaRow}>
           <View>
-            <Text style={styles.dateLabel}>
-              {formatFullDate(entry.date)}
-            </Text>
-            <Text style={styles.langName}>
-              {LANG_NAMES[entry.language] ?? entry.language}
-            </Text>
+            <Text style={styles.dateLabel}>{formatFullDate(entry.date)}</Text>
+            <Text style={styles.langName}>{LANG_NAMES[entry.language] ?? entry.language}</Text>
           </View>
           <View style={[styles.langBadge, { backgroundColor: langColor }]}>
             <Text style={styles.langBadgeText}>{entry.language}</Text>
@@ -147,9 +181,47 @@ export default function EntryDetailScreen() {
 
         {/* Full transcript */}
         <View style={styles.transcriptSection}>
-          <Text style={styles.transcriptLabel}>TRANSCRIPT</Text>
-          {entry.transcript ? (
-            <Text style={styles.transcript}>{entry.transcript}</Text>
+          <View style={styles.transcriptHeader}>
+            <Text style={styles.transcriptLabel}>TRANSCRIPT</Text>
+            {!isEditing && (
+              <TouchableOpacity onPress={startEdit} activeOpacity={0.6}>
+                <Text style={styles.editBtn}>Edit</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {isEditing ? (
+            <>
+              <TextInput
+                ref={inputRef}
+                style={styles.transcriptInput}
+                value={draft}
+                onChangeText={setDraft}
+                multiline
+                autoFocus
+                textAlignVertical="top"
+                placeholder="Write your entry…"
+                placeholderTextColor={colors.textMuted}
+              />
+              <View style={styles.editActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={cancelEdit} activeOpacity={0.7}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+                  onPress={saveEdit}
+                  disabled={saving}
+                  activeOpacity={0.8}
+                >
+                  {saving
+                    ? <ActivityIndicator color={colors.bgCard} size="small" />
+                    : <Text style={styles.saveBtnText}>Save</Text>
+                  }
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : transcript ? (
+            <Text style={styles.transcript}>{transcript}</Text>
           ) : (
             <Text style={styles.transcriptEmpty}>No transcript available.</Text>
           )}
@@ -160,12 +232,8 @@ export default function EntryDetailScreen() {
           <Text style={styles.playerLabel}>RECORDING</Text>
           <View style={styles.playerCard}>
             <View style={styles.playerMeta}>
-              <Text style={styles.playerMetaText}>
-                {formatFullDate(entry.date)}
-              </Text>
-              <Text style={styles.playerMetaText}>
-                {formatDuration(entry.duration_seconds)}
-              </Text>
+              <Text style={styles.playerMetaText}>{formatFullDate(entry.date)}</Text>
+              <Text style={styles.playerMetaText}>{formatDuration(entry.duration_seconds)}</Text>
             </View>
             <AudioPlayer uri={entry.audio_url} duration={entry.duration_seconds} />
           </View>
@@ -254,12 +322,23 @@ const styles = StyleSheet.create({
   transcriptSection: {
     marginBottom: spacing.xl,
   },
+  transcriptHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
   transcriptLabel: {
     fontFamily: fonts.mono,
     fontSize: fontSize.xs,
     color: colors.textMuted,
     letterSpacing: letterSpacing.wide,
-    marginBottom: spacing.md,
+  },
+  editBtn: {
+    fontFamily: fonts.mono,
+    fontSize: fontSize.xs,
+    color: colors.terracotta,
+    letterSpacing: letterSpacing.wide,
   },
   transcript: {
     fontFamily: fonts.sans,
@@ -271,6 +350,51 @@ const styles = StyleSheet.create({
     fontFamily: fonts.serifItalic,
     fontSize: fontSize.base,
     color: colors.textMuted,
+  },
+  transcriptInput: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.base,
+    color: colors.textPrimary,
+    lineHeight: 26,
+    borderWidth: 1,
+    borderColor: colors.terracotta,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    minHeight: 160,
+    backgroundColor: colors.bgCard,
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: spacing.sm + 2,
+    alignItems: 'center',
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cancelBtnText: {
+    fontFamily: fonts.sans,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
+  saveBtn: {
+    flex: 1,
+    paddingVertical: spacing.sm + 2,
+    alignItems: 'center',
+    borderRadius: radius.full,
+    backgroundColor: colors.bgDark,
+  },
+  saveBtnDisabled: {
+    opacity: 0.6,
+  },
+  saveBtnText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: fontSize.sm,
+    color: colors.bgCard,
   },
   playerSection: {
     gap: spacing.md,

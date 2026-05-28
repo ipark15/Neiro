@@ -1,9 +1,14 @@
 import os
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException
+from pydantic import BaseModel
 from supabase import create_client
 
 from models import Entry
 from services import whisper, storage
+
+
+class TranscriptUpdate(BaseModel):
+    transcript: str
 
 router = APIRouter(prefix="/entries", tags=["entries"])
 
@@ -79,6 +84,20 @@ def get_entry(user_id: str, date: str):
         .eq("user_id", user_id)
         .eq("date", date)
         .limit(1)
+        .execute()
+    )
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Entry not found.")
+    return Entry(**response.data[0])
+
+
+@router.patch("/{entry_id}", response_model=Entry)
+def update_entry(entry_id: str, body: TranscriptUpdate):
+    response = (
+        db()
+        .table("entries")
+        .update({"transcript": body.transcript})
+        .eq("id", entry_id)
         .execute()
     )
     if not response.data:
