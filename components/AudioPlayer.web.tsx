@@ -60,20 +60,25 @@ export function AudioPlayer({ uri, duration }: { uri: string; duration: number |
     if (playing) {
       audio.pause();
       setPlaying(false);
-    } else {
-      if (progress >= 1) {
-        audio.currentTime = 0;
-        setProgress(0);
-        setElapsed(0);
-      }
-      setIsLoading(true);
-      try {
-        await audio.play();
-        setPlaying(true);
-      } catch (err) {
-        console.error('Audio play failed:', err);
-        setIsLoading(false);
-      }
+      return;
+    }
+    if (progress >= 1) {
+      audio.currentTime = 0;
+      setProgress(0);
+      setElapsed(0);
+    }
+    // Call play() synchronously before any state updates — iOS Safari requires
+    // audio.play() to be called within the user-gesture call stack with no async
+    // gaps or React state flushes preceding it.
+    const playPromise = audio.play();
+    setIsLoading(true);
+    try {
+      await playPromise;
+      setPlaying(true);
+    } catch (err) {
+      console.error('Audio play failed:', err);
+    } finally {
+      setIsLoading(false);
     }
   }
 
