@@ -64,6 +64,11 @@ export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState<string>(toDateKey(today));
   const [loading, setLoading] = useState(true);
 
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    // _layout.tsx listens for SIGNED_OUT and redirects to /(auth)
+  }
+
   // Reload entries every time this tab comes into focus so new recordings appear
   useFocusEffect(
     useCallback(() => {
@@ -119,8 +124,15 @@ export default function CalendarScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerSub}>your year, day by day</Text>
-          <Text style={styles.headerTitle}>The Ledger</Text>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.headerSub}>your year, day by day</Text>
+              <Text style={styles.headerTitle}>The Ledger</Text>
+            </View>
+            <TouchableOpacity onPress={handleSignOut} activeOpacity={0.6}>
+              <Text style={styles.signOutText}>Sign out</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Stats row — three equal boxes */}
@@ -254,6 +266,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     marginBottom: spacing.lg,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  signOutText: {
+    fontFamily: fonts.mono,
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+    letterSpacing: letterSpacing.wide,
   },
   headerSub: {
     fontFamily: fonts.serifItalic,
