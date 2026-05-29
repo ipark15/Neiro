@@ -35,7 +35,7 @@ export default function TabLayout() {
           styles.tabBar,
           {
             paddingBottom: insets.bottom,
-            height: (Platform.OS === 'web' ? 64 : 72) + insets.bottom,
+            height: (Platform.OS === 'web' ? 58 : 64) + insets.bottom,
           },
         ],
         tabBarActiveTintColor: colors.terracotta,

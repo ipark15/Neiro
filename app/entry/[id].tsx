@@ -184,7 +184,8 @@ export default function EntryDetailScreen() {
           <View style={styles.transcriptHeader}>
             <Text style={styles.transcriptLabel}>TRANSCRIPT</Text>
             {!isEditing && (
-              <TouchableOpacity onPress={startEdit} activeOpacity={0.6}>
+              <TouchableOpacity onPress={startEdit} activeOpacity={0.6} style={styles.editBtnRow}>
+                <Text style={styles.editBtnIcon}>✎</Text>
                 <Text style={styles.editBtn}>Edit</Text>
               </TouchableOpacity>
             )}
@@ -333,6 +334,16 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.textMuted,
     letterSpacing: letterSpacing.wide,
+  },
+  editBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  editBtnIcon: {
+    fontSize: 13,
+    color: colors.terracotta,
+    lineHeight: 16,
   },
   editBtn: {
     fontFamily: fonts.mono,
