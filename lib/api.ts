@@ -63,3 +63,35 @@ export async function updateEntry(entry_id: string, transcript: string): Promise
 export async function deleteEntry(entry_id: string): Promise<void> {
   await api.delete(`/entries/${entry_id}`);
 }
+
+// ─── Chat ─────────────────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatResponse {
+  user_message: string;
+  ai_text: string;
+  ai_audio_base64: string;
+}
+
+export async function sendChatMessage(params: {
+  file: Blob;
+  filename?: string;
+  language: string;
+  persona?: string;
+  conversation_history?: ChatMessage[];
+}): Promise<ChatResponse> {
+  const form = new FormData();
+  form.append('file', params.file, params.filename ?? 'recording.webm');
+  form.append('language', params.language);
+  if (params.persona) form.append('persona', params.persona);
+  form.append(
+    'conversation_history',
+    JSON.stringify(params.conversation_history ?? [])
+  );
+  const { data } = await api.post<ChatResponse>('/chat/message', form);
+  return data;
+}

@@ -11,6 +11,18 @@ function RecordIcon({ focused }: { focused: boolean }) {
   );
 }
 
+function PartnerIcon({ focused }: { focused: boolean }) {
+  const c = focused ? colors.terracotta : colors.textSecondary;
+  return (
+    <View style={[styles.partnerBubble, { borderColor: c }]}>
+      <View style={[styles.partnerTail, { borderTopColor: c }]} />
+      <View style={[styles.partnerDot, { backgroundColor: c }]} />
+      <View style={[styles.partnerDot, { backgroundColor: c }]} />
+      <View style={[styles.partnerDot, { backgroundColor: c }]} />
+    </View>
+  );
+}
+
 function CalendarIcon({ focused }: { focused: boolean }) {
   const c = focused ? colors.terracotta : colors.textSecondary;
   return (
@@ -57,6 +69,13 @@ export default function TabLayout() {
           tabBarIcon: ({ focused }) => <CalendarIcon focused={focused} />,
         }}
       />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'PARTNER',
+          tabBarIcon: ({ focused }) => <PartnerIcon focused={focused} />,
+        }}
+      />
     </Tabs>
   );
 }
@@ -98,6 +117,35 @@ const styles = StyleSheet.create({
   },
   recordDotActive: {
     backgroundColor: colors.terracotta,
+  },
+  // Partner icon: rounded speech bubble with three dots inside + tail
+  partnerBubble: {
+    width: 20,
+    height: 15,
+    borderWidth: 1.5,
+    borderRadius: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    position: 'relative',
+  },
+  partnerTail: {
+    position: 'absolute',
+    bottom: -4,
+    left: 4,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 3,
+    borderRightWidth: 3,
+    borderTopWidth: 4,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  partnerDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
   },
   // Calendar icon: border box with header strip + dot grid
   calWrap: {
