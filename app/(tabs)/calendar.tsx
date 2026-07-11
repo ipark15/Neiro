@@ -34,6 +34,10 @@ function calcStreak(entryDates: Set<string>): number {
   let streak = 0;
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
+  // No entry yet today shouldn't zero the streak — start counting from yesterday
+  if (!entryDates.has(toDateKey(cursor))) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
   while (entryDates.has(toDateKey(cursor))) {
     streak++;
     cursor.setDate(cursor.getDate() - 1);
@@ -78,9 +82,9 @@ export default function CalendarScreen() {
 
   async function loadEntries() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const data = await getEntries(user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const data = await getEntries();
       setEntries(data);
     } catch {
       // non-critical

@@ -38,21 +38,26 @@ export function AudioPlayer({ uri, duration }: { uri: string; duration: number |
     // Fires when audio stalls mid-playback and is buffering
     const onWaiting = () => setIsLoading(true);
     const onPlaying = () => setIsLoading(false);
+    // Keep state in sync when playback is paused outside the button
+    // (media keys, OS media controls, another tab grabbing audio focus)
+    const onPause = () => setPlaying(false);
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('waiting', onWaiting);
     audio.addEventListener('playing', onPlaying);
+    audio.addEventListener('pause', onPause);
 
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('waiting', onWaiting);
       audio.removeEventListener('playing', onPlaying);
+      audio.removeEventListener('pause', onPause);
       audio.pause();
       audio.src = '';
     };
-  }, [uri]);
+  }, [uri, duration]);
 
   async function togglePlay() {
     const audio = audioRef.current;
@@ -96,7 +101,8 @@ export function AudioPlayer({ uri, duration }: { uri: string; duration: number |
         <View style={{ flex: Math.max(0.001, 1 - progress) }} />
       </View>
       <Text style={styles.time}>
-        {playing ? formatDuration(elapsed) : formatDuration(duration)}
+        {/* Show position while playing or paused mid-track; total duration when idle */}
+        {playing || elapsed > 0 ? formatDuration(elapsed) : formatDuration(duration)}
       </Text>
     </View>
   );

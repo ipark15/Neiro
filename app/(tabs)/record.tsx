@@ -35,6 +35,11 @@ function formatDate(): { day: string; date: string } {
   return { day, date };
 }
 
+function todayKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
 function formatVolume(count: number): string {
   return `VOL.${count.toString().padStart(3, '0')}`;
 }
@@ -68,15 +73,17 @@ function RecordScreenWeb() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const animIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const { day, date } = formatDate();
 
   useEffect(() => { loadEntryCount(); }, []);
 
   async function loadEntryCount() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const entries = await getEntries(user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const entries = await getEntries();
       setEntryCount(entries.length);
     } catch {}
   }
@@ -84,6 +91,27 @@ function RecordScreenWeb() {
   const stopTimer = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }, []);
+
+  const stopAnimation = useCallback(() => {
+    if (animIntervalRef.current) { clearInterval(animIntervalRef.current); animIntervalRef.current = null; }
+    audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current = null;
+  }, []);
+
+  // If the user navigates away mid-recording, release the mic and all timers —
+  // otherwise the browser's "microphone in use" indicator stays on.
+  useEffect(() => {
+    return () => {
+      stopTimer();
+      stopAnimation();
+      const mr = mediaRecorderRef.current;
+      if (mr) {
+        mr.onstop = null;
+        if (mr.state !== 'inactive') mr.stop();
+        mr.stream.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, [stopTimer, stopAnimation]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -95,11 +123,26 @@ function RecordScreenWeb() {
       mediaRecorderRef.current = mr;
       audioChunksRef.current = [];
 
-      const animInterval = setInterval(() => {
-        rawAmplitudes.current = rawAmplitudes.current.map(() => Math.random() * 0.8);
+      // Drive the waveform from real mic amplitude via an AnalyserNode
+      const audioContext = new AudioContext();
+      audioContextRef.current = audioContext;
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      audioContext.createMediaStreamSource(stream).connect(analyser);
+      const samples = new Uint8Array(analyser.fftSize);
+
+      animIntervalRef.current = setInterval(() => {
+        analyser.getByteTimeDomainData(samples);
+        let sumSquares = 0;
+        for (let i = 0; i < samples.length; i++) {
+          const centered = (samples[i] - 128) / 128;
+          sumSquares += centered * centered;
+        }
+        const rms = Math.sqrt(sumSquares / samples.length);
+        const normalized = Math.min(1, rms * 4);
+        rawAmplitudes.current = [...rawAmplitudes.current.slice(1), normalized];
         rawAmplitudes.current.forEach((val, i) => animatedBars.current[i].setValue(val * 44 + 4));
       }, 100);
-      (mr as any)._animInterval = animInterval;
 
       mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mr.start(100);
@@ -111,12 +154,15 @@ function RecordScreenWeb() {
     }
   }, []);
 
-  const stopRecording = useCallback((currentTimer: number) => {
+  const stopRecording = useCallback((currentTimer: number, language: string) => {
     stopTimer();
-    setStatus('processing');
+    stopAnimation();
     const mr = mediaRecorderRef.current;
-    if (!mr) return;
-    clearInterval((mr as any)._animInterval);
+    if (!mr) {
+      setStatus('ready');
+      return;
+    }
+    setStatus('processing');
     mr.onstop = async () => {
       try {
         // Use the actual MIME type the browser chose (e.g. audio/mp4 on iOS Safari)
@@ -124,11 +170,7 @@ function RecordScreenWeb() {
         const ext = baseMime === 'audio/mp4' ? 'm4a' : (baseMime.split('/')[1] ?? 'webm');
         const blob = new Blob(audioChunksRef.current, { type: baseMime });
         mr.stream.getTracks().forEach((t) => t.stop());
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Not signed in');
-        const now = new Date();
-        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        await uploadEntry({ file: blob, filename: `recording.${ext}`, user_id: user.id, date: today, duration_seconds: currentTimer });
+        await uploadEntry({ file: blob, filename: `recording.${ext}`, date: todayKey(), language, duration_seconds: currentTimer });
         setEntryCount((c) => c + 1);
         rawAmplitudes.current = Array(WAVEFORM_BARS).fill(0);
         animatedBars.current.forEach((v) => v.setValue(4));
@@ -141,11 +183,11 @@ function RecordScreenWeb() {
       }
     };
     mr.stop();
-  }, [stopTimer, router]);
+  }, [stopTimer, stopAnimation, router]);
 
   function handleToggle() {
     if (status === 'ready') startRecording();
-    else if (status === 'recording') stopRecording(timer);
+    else if (status === 'recording') stopRecording(timer, selectedLang);
   }
 
   const statusLabel = status === 'ready' ? 'READY' : status === 'recording' ? 'RECORDING' : 'SAVING…';
@@ -222,11 +264,18 @@ function RecordScreenNative({ useAudioRecorder, useAudioRecorderState, AudioModu
     loadEntryCount();
   }, []);
 
+  // Clear the 1s timer if the screen unmounts mid-recording
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
   async function loadEntryCount() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const entries = await getEntries(user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const entries = await getEntries();
       setEntryCount(entries.length);
     } catch {}
   }
@@ -245,7 +294,7 @@ function RecordScreenNative({ useAudioRecorder, useAudioRecorderState, AudioModu
         Alert.alert('Permission needed', 'Microphone access is required to record entries.');
         return;
       }
-      await AudioModule.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      await AudioModule.setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
       setStatus('recording');
@@ -261,14 +310,10 @@ function RecordScreenNative({ useAudioRecorder, useAudioRecorderState, AudioModu
     try {
       setStatus('processing');
       await recorder.stop();
-      await AudioModule.setAudioModeAsync({ allowsRecordingIOS: false });
+      await AudioModule.setAudioModeAsync({ allowsRecording: false });
       const uri = recorder.uri;
       if (!uri) throw new Error('No recording URI');
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not signed in');
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      await uploadEntry({ file: { uri, name: 'recording.m4a', type: 'audio/m4a' }, user_id: user.id, date: today, duration_seconds: timer });
+      await uploadEntry({ file: { uri, name: 'recording.m4a', type: 'audio/m4a' }, date: todayKey(), language: selectedLang, duration_seconds: timer });
       setEntryCount((c) => c + 1);
       rawAmplitudes.current = Array(WAVEFORM_BARS).fill(0);
       animatedBars.current.forEach((v) => v.setValue(4));
@@ -279,7 +324,7 @@ function RecordScreenNative({ useAudioRecorder, useAudioRecorderState, AudioModu
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save entry.');
       setStatus('ready');
     }
-  }, [stopTimer, timer, router, recorder]);
+  }, [stopTimer, timer, selectedLang, router, recorder]);
 
   function handleToggle() {
     if (status === 'ready') startRecording();

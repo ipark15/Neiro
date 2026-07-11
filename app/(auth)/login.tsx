@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,12 @@ import { colors, fonts, fontSize, spacing, radius, letterSpacing } from '@/const
 
 type Mode = 'signup' | 'signin';
 
+// Alert.alert is a no-op in react-native-web — errors must use window.alert there
+function showMessage(title: string, message: string) {
+  if (Platform.OS === 'web') alert(message);
+  else Alert.alert(title, message);
+}
+
 export default function LoginScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: Mode }>();
@@ -27,17 +33,32 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // On web the search params can be empty on the first (hydration) render,
+  // so the initial state alone would leave "?mode=signin" on the signup tab
+  useEffect(() => {
+    if (params.mode === 'signin' || params.mode === 'signup') {
+      setMode(params.mode);
+    }
+  }, [params.mode]);
+
   async function handleSubmit() {
     if (!email || !password) return;
     setLoading(true);
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { name } },
         });
         if (error) throw error;
+        // With email confirmation enabled Supabase returns no session yet —
+        // redirecting to the app would strand the user unauthenticated
+        if (!data.session) {
+          showMessage('Confirm your email', 'Check your inbox to confirm your account, then sign in.');
+          setMode('signin');
+          return;
+        }
         router.replace('/(tabs)/record');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -46,7 +67,7 @@ export default function LoginScreen() {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Something went wrong.';
-      Alert.alert('Error', message);
+      showMessage('Error', message);
     } finally {
       setLoading(false);
     }
