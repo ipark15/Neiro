@@ -29,7 +29,7 @@ async def chat_message(
 
     # Step 1: Transcribe audio (no DB save — chat messages are ephemeral)
     try:
-        result = await whisper.transcribe(audio_bytes, filename)
+        result = await whisper.transcribe(audio_bytes, filename, language)
         user_message = result["transcript"]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Transcription failed: {e}")
