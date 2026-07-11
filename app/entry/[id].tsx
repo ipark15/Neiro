@@ -10,9 +10,9 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAudioPlayer, useAudioPlayerStatus, AudioModule } from 'expo-audio';
+import { AudioPlayer } from '@/components/AudioPlayer';
 import type { Entry } from '@/lib/api';
 import { updateEntry } from '@/lib/api';
 import { colors, fonts, fontSize, spacing, radius, letterSpacing } from '@/constants/theme';
@@ -34,87 +34,28 @@ function formatDuration(seconds: number | null): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function AudioPlayer({ uri, duration }: { uri: string; duration: number | null }) {
-  const player = useAudioPlayer(uri);
-  const status = useAudioPlayerStatus(player);
-
-  const playing = status.playing;
-  const positionMs = status.currentTime * 1000;
-  const totalDuration = status.duration > 0 ? status.duration : (duration ?? 0);
-  const durationMs = totalDuration * 1000;
-  const progress = durationMs > 0 ? positionMs / durationMs : 0;
-
-  async function togglePlay() {
-    await AudioModule.setAudioModeAsync({ playsInSilentModeIOS: true });
-    if (playing) {
-      player.pause();
-    } else {
-      if (status.didJustFinish) player.seekTo(0);
-      player.play();
-    }
+function parseEntry(data: string | undefined): Entry | null {
+  if (!data) return null;
+  try {
+    return JSON.parse(data) as Entry;
+  } catch {
+    return null;
   }
-
-  return (
-    <View style={playerStyles.container}>
-      <TouchableOpacity style={playerStyles.playBtn} onPress={togglePlay} activeOpacity={0.8}>
-        {status.isLoading
-          ? <ActivityIndicator color={colors.bgCard} size="small" />
-          : <Text style={playerStyles.playIcon}>{playing ? '❚❚' : '▶'}</Text>
-        }
-      </TouchableOpacity>
-      <View style={playerStyles.track}>
-        <View style={[playerStyles.fill, { flex: progress }]} />
-        <View style={{ flex: Math.max(1 - progress, 0) }} />
-      </View>
-      <Text style={playerStyles.time}>
-        {playing ? formatDuration(Math.floor(positionMs / 1000)) : formatDuration(duration)}
-      </Text>
-
-    </View>
-  );
 }
-
-const playerStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.bg,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  playBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.bgDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playIcon: { color: colors.bgCard, fontSize: 13 },
-  track: {
-    flex: 1,
-    height: 3,
-    flexDirection: 'row',
-    backgroundColor: colors.border,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  fill: { backgroundColor: colors.terracotta },
-  time: {
-    fontFamily: fonts.mono,
-    fontSize: fontSize.xs,
-    color: colors.textSecondary,
-    minWidth: 32,
-    textAlign: 'right',
-  },
-});
 
 export default function EntryDetailScreen() {
   const router = useRouter();
-  const { data } = useLocalSearchParams<{ data: string }>();
-  const entry: Entry = JSON.parse(data);
+  const { data } = useLocalSearchParams<{ data?: string }>();
+  const entry = parseEntry(data);
 
+  // Opened directly (shared link, refresh with a stripped query) — there's no
+  // entry payload to show, so fall back to the calendar
+  if (!entry) return <Redirect href="/(tabs)/calendar" />;
+
+  return <EntryDetail entry={entry} router={router} />;
+}
+
+function EntryDetail({ entry, router }: { entry: Entry; router: ReturnType<typeof useRouter> }) {
   const [transcript, setTranscript] = useState(entry.transcript ?? '');
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState('');

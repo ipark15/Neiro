@@ -1,7 +1,25 @@
 import axios from 'axios';
+import { supabase } from '@/lib/supabase';
+
+const baseURL = process.env.EXPO_PUBLIC_API_URL;
+if (!baseURL) {
+  console.error(
+    'EXPO_PUBLIC_API_URL is not set — API calls will fall back to http://localhost:8000 and fail in production.'
+  );
+}
 
 const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000',
+  baseURL: baseURL ?? 'http://localhost:8000',
+});
+
+// Attach the Supabase JWT — the backend derives the user from it and rejects
+// unauthenticated requests, so user_id is never sent from the client.
+api.interceptors.request.use(async (config) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
+  }
+  return config;
 });
 
 export interface Entry {
@@ -18,8 +36,8 @@ export interface Entry {
 export async function uploadEntry(params: {
   file: { uri: string; name: string; type: string } | Blob;
   filename?: string;
-  user_id: string;
   date: string;
+  language: string;
   duration_seconds?: number;
 }): Promise<Entry> {
   const form = new FormData();
@@ -32,8 +50,8 @@ export async function uploadEntry(params: {
     form.append('file', params.file as unknown as Blob);
   }
 
-  form.append('user_id', params.user_id);
   form.append('date', params.date);
+  form.append('language', params.language);
   if (params.duration_seconds != null) {
     form.append('duration_seconds', String(params.duration_seconds));
   }
@@ -45,13 +63,8 @@ export async function uploadEntry(params: {
   return data;
 }
 
-export async function getEntries(user_id: string): Promise<Entry[]> {
-  const { data } = await api.get<Entry[]>(`/entries/${user_id}`);
-  return data;
-}
-
-export async function getEntry(user_id: string, date: string): Promise<Entry> {
-  const { data } = await api.get<Entry>(`/entries/${user_id}/${date}`);
+export async function getEntries(): Promise<Entry[]> {
+  const { data } = await api.get<Entry[]>('/entries');
   return data;
 }
 

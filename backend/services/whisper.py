@@ -13,8 +13,8 @@ LANG_MAP = {
     "de": "DE",
 }
 
-# Reverse map: our display codes → ISO 639-1 for Whisper
-WHISPER_LANG_MAP = {v: k for k, v in LANG_MAP.items()}
+# Display codes ("EN") back to ISO 639-1 ("en") for the Whisper language hint
+DISPLAY_TO_ISO = {display: iso for iso, display in LANG_MAP.items()}
 
 
 MIME_MAP = {
@@ -34,17 +34,25 @@ async def transcribe(audio_bytes: bytes, filename: str, language: str | None = N
     ext = os.path.splitext(filename)[1].lower()
     mime_type = MIME_MAP.get(ext, "audio/webm")
 
-    whisper_lang = WHISPER_LANG_MAP.get(language or "", None)
+    # If the user picked a language, hint Whisper — auto-detection misfires on
+    # short clips, and the hint keeps the transcript in the intended language.
+    iso_hint = DISPLAY_TO_ISO.get((language or "").upper())
+
+    kwargs = {}
+    if iso_hint:
+        kwargs["language"] = iso_hint
 
     result = await client.audio.transcriptions.create(
         model="whisper-large-v3",
         file=(filename, audio_bytes, mime_type),
         response_format="verbose_json",
-        **({"language": whisper_lang} if whisper_lang else {}),
+        **kwargs,
     )
 
     language_raw = getattr(result, "language", "") or ""
-    language = LANG_MAP.get(language_raw.lower(), language_raw.upper()[:2])
+    detected = LANG_MAP.get(language_raw.lower(), language_raw.upper()[:2])
+    # The user's explicit choice wins over detection
+    final_language = language.upper() if language and iso_hint else detected
 
     duration_seconds: int | None = None
     segments = getattr(result, "segments", None) or []
@@ -53,6 +61,6 @@ async def transcribe(audio_bytes: bytes, filename: str, language: str | None = N
 
     return {
         "transcript": result.text,
-        "language": language,
+        "language": final_language,
         "duration_seconds": duration_seconds,
     }
