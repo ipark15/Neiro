@@ -13,7 +13,7 @@ import { sendChatMessage, ChatMessage } from '@/lib/api';
 import LangSelector from '@/components/LangSelector';
 import { colors, fonts, fontSize, spacing, radius, letterSpacing } from '@/constants/theme';
 
-type Status = 'idle' | 'recording' | 'thinking' | 'speaking';
+type Status = 'idle' | 'recording' | 'thinking' | 'speaking' | 'blocked';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -39,6 +39,7 @@ function ChatScreenWeb() {
   const [selectedLang, setSelectedLang] = useState('EN');
   const [status, setStatus] = useState<Status>('idle');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [pendingAudio, setPendingAudio] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -53,7 +54,19 @@ function ChatScreenWeb() {
     setStatus('speaking');
     audio.onended = () => setStatus('idle');
     audio.onerror = () => setStatus('idle');
-    audio.play().catch(() => setStatus('idle'));
+    audio.play().catch(() => {
+      // Safari blocks autoplay when triggered outside a direct user gesture.
+      // Surface a tap-to-play prompt instead of silently failing.
+      setPendingAudio(base64);
+      setStatus('blocked');
+    });
+  }
+
+  function playPending() {
+    if (!pendingAudio) return;
+    const base64 = pendingAudio;
+    setPendingAudio(null);
+    playAudio(base64);
   }
 
   const startRecording = useCallback(async () => {
@@ -127,7 +140,9 @@ function ChatScreenWeb() {
   );
 
   function handleToggle() {
-    if (status === 'idle' || status === 'speaking') {
+    if (status === 'blocked') {
+      playPending();
+    } else if (status === 'idle' || status === 'speaking') {
       startRecording();
     } else if (status === 'recording') {
       stopRecording(messages, selectedLang);
@@ -149,10 +164,12 @@ function ChatScreenWeb() {
     recording: 'LISTENING…',
     thinking: 'THINKING…',
     speaking: 'SPEAKING…',
+    blocked: 'TAP TO PLAY',
   };
 
   const isDisabled = status === 'thinking';
   const isRecording = status === 'recording';
+  const isBlocked = status === 'blocked';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -211,13 +228,15 @@ function ChatScreenWeb() {
       <View style={styles.recordArea}>
         <Text style={styles.statusLabel}>{statusLabel[status]}</Text>
         <TouchableOpacity
-          style={[styles.recordBtn, isRecording && styles.recordBtnActive]}
+          style={[styles.recordBtn, isRecording && styles.recordBtnActive, isBlocked && styles.recordBtnBlocked]}
           onPress={handleToggle}
           disabled={isDisabled}
           activeOpacity={0.8}
         >
           {status === 'thinking' ? (
             <ActivityIndicator color={colors.terracotta} />
+          ) : isBlocked ? (
+            <Text style={styles.playIcon}>▶</Text>
           ) : (
             <View style={[styles.recordDot, isRecording && styles.recordDotStop]} />
           )}
@@ -365,6 +384,14 @@ const styles = StyleSheet.create({
   },
   recordBtnActive: {
     borderColor: colors.terracotta,
+  },
+  recordBtnBlocked: {
+    borderColor: colors.terracotta,
+    backgroundColor: colors.terracotta + '18',
+  },
+  playIcon: {
+    fontSize: 22,
+    color: colors.terracotta,
   },
   recordDot: {
     width: 34,

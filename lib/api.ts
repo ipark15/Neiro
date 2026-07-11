@@ -105,6 +105,6 @@ export async function sendChatMessage(params: {
     'conversation_history',
     JSON.stringify(params.conversation_history ?? [])
   );
-  const { data } = await api.post<ChatResponse>('/chat/message', form);
+  const { data } = await api.post<ChatResponse>('/chat/message', form, { timeout: 60000 });
   return data;
 }

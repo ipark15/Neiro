@@ -42,14 +42,14 @@ async def chat_message(
 
     # Step 3: Get Claude response
     try:
-        ai_text = claude_service.get_response(user_message, language, history, persona)
+        ai_text = await claude_service.get_response(user_message, language, history, persona)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI response failed: {e}")
 
     # Step 4: Convert AI text to speech
     try:
         persona_config = PERSONAS.get(persona, PERSONAS[DEFAULT_PERSONA])
-        audio_bytes_out = elevenlabs.text_to_speech(ai_text, persona_config["voice_id"])
+        audio_bytes_out = await elevenlabs.text_to_speech(ai_text, persona_config["voice_id"])
         ai_audio_b64 = base64.b64encode(audio_bytes_out).decode("utf-8")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Text-to-speech failed: {e}")

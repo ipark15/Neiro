@@ -2,7 +2,7 @@ import os
 import anthropic
 from config.personas import PERSONAS, DEFAULT_PERSONA
 
-_client: anthropic.Anthropic | None = None
+_client: anthropic.AsyncAnthropic | None = None
 
 LANGUAGE_NAMES = {
     "EN": "English",
@@ -15,14 +15,14 @@ LANGUAGE_NAMES = {
 }
 
 
-def _get_client() -> anthropic.Anthropic:
+def _get_client() -> anthropic.AsyncAnthropic:
     global _client
     if _client is None:
-        _client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        _client = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     return _client
 
 
-def get_response(
+async def get_response(
     message: str,
     language: str,
     conversation_history: list[dict],
@@ -32,10 +32,9 @@ def get_response(
     language_name = LANGUAGE_NAMES.get(language, language)
     system_prompt = persona_config["system_prompt_template"].format(language=language_name)
 
-    # Append the new user message to history for this call
     messages = conversation_history + [{"role": "user", "content": message}]
 
-    response = _get_client().messages.create(
+    response = await _get_client().messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=256,
         system=system_prompt,
