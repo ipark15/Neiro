@@ -22,7 +22,7 @@ export function AudioPlayer({ uri, duration }: { uri: string; duration: number |
   const elapsed = Math.floor(positionMs / 1000);
 
   async function togglePlay() {
-    await AudioModule.setAudioModeAsync({ playsInSilentModeIOS: true });
+    await AudioModule.setAudioModeAsync({ playsInSilentMode: true });
     if (playing) {
       player.pause();
     } else {
@@ -34,7 +34,7 @@ export function AudioPlayer({ uri, duration }: { uri: string; duration: number |
   return (
     <View style={styles.row}>
       <TouchableOpacity style={styles.playBtn} onPress={togglePlay} activeOpacity={0.8}>
-        {status.isLoading ? (
+        {status.isBuffering ? (
           <ActivityIndicator color={colors.bgCard} size="small" />
         ) : (
           <Text style={styles.playIcon}>{playing ? '❚❚' : '▶'}</Text>
