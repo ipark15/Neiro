@@ -16,8 +16,15 @@ CONTENT_TYPE_MAP = {
 }
 
 
+_client: Client | None = None
+
+
 def get_client() -> Client:
-    return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
+    # Reuse one client so uploads don't pay a fresh TLS handshake every time
+    global _client
+    if _client is None:
+        _client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
+    return _client
 
 
 def upload_audio(audio_bytes: bytes, filename: str) -> str:

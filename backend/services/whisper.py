@@ -28,8 +28,18 @@ MIME_MAP = {
 }
 
 
+_client: AsyncGroq | None = None
+
+
+def get_client() -> AsyncGroq:
+    global _client
+    if _client is None:
+        _client = AsyncGroq(api_key=os.environ["GROQ_API_KEY"])
+    return _client
+
+
 async def transcribe(audio_bytes: bytes, filename: str, language: str | None = None) -> dict:
-    client = AsyncGroq(api_key=os.environ["GROQ_API_KEY"])
+    client = get_client()
 
     ext = os.path.splitext(filename)[1].lower()
     mime_type = MIME_MAP.get(ext, "audio/webm")

@@ -11,7 +11,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
-import { getEntries } from '@/lib/api';
+import { getEntries, getCachedEntries } from '@/lib/api';
 import type { Entry } from '@/lib/api';
 import { colors, fonts, fontSize, spacing, radius, letterSpacing } from '@/constants/theme';
 
@@ -64,9 +64,11 @@ export default function CalendarScreen() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
-  const [entries, setEntries] = useState<Entry[]>([]);
+  // Seed from the cache so returning to this tab renders instantly; the focus
+  // effect still refreshes from the server in the background
+  const [entries, setEntries] = useState<Entry[]>(() => getCachedEntries() ?? []);
   const [selectedDate, setSelectedDate] = useState<string>(toDateKey(today));
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(getCachedEntries() === null);
 
   async function handleSignOut() {
     await supabase.auth.signOut();

@@ -60,19 +60,35 @@ export async function uploadEntry(params: {
   // multipart boundary (e.g. multipart/form-data; boundary=----xyz).
   // Overriding it strips the boundary and the server receives an empty file.
   const { data } = await api.post<Entry>('/entries', form);
+  if (entriesCache) entriesCache = [data, ...entriesCache];
   return data;
+}
+
+// In-memory cache of the last fetched entries so screens can render instantly
+// on tab switches and refresh in the background instead of showing spinners.
+let entriesCache: Entry[] | null = null;
+
+export function getCachedEntries(): Entry[] | null {
+  return entriesCache;
+}
+
+export function clearEntriesCache() {
+  entriesCache = null;
 }
 
 export async function getEntries(): Promise<Entry[]> {
   const { data } = await api.get<Entry[]>('/entries');
+  entriesCache = data;
   return data;
 }
 
 export async function updateEntry(entry_id: string, transcript: string): Promise<Entry> {
   const { data } = await api.patch<Entry>(`/entries/${entry_id}`, { transcript });
+  entriesCache = entriesCache?.map((e) => (e.id === data.id ? data : e)) ?? null;
   return data;
 }
 
 export async function deleteEntry(entry_id: string): Promise<void> {
   await api.delete(`/entries/${entry_id}`);
+  entriesCache = entriesCache?.filter((e) => e.id !== entry_id) ?? null;
 }

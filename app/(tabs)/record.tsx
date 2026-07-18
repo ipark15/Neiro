@@ -13,7 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
-import { uploadEntry, getEntries } from '@/lib/api';
+import { uploadEntry, getEntries, getCachedEntries } from '@/lib/api';
 import LangSelector from '@/components/LangSelector';
 import Waveform from '@/components/Waveform';
 import { colors, fonts, fontSize, spacing, radius, letterSpacing } from '@/constants/theme';
@@ -69,7 +69,7 @@ function RecordScreenWeb() {
     Array.from({ length: WAVEFORM_BARS }, () => new Animated.Value(4))
   );
   const rawAmplitudes = useRef<number[]>(Array(WAVEFORM_BARS).fill(0));
-  const [entryCount, setEntryCount] = useState(0);
+  const [entryCount, setEntryCount] = useState(() => getCachedEntries()?.length ?? 0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -243,7 +243,7 @@ function RecordScreenNative({ useAudioRecorder, useAudioRecorderState, AudioModu
     Array.from({ length: WAVEFORM_BARS }, () => new Animated.Value(4))
   );
   const rawAmplitudes = useRef<number[]>(Array(WAVEFORM_BARS).fill(0));
-  const [entryCount, setEntryCount] = useState(0);
+  const [entryCount, setEntryCount] = useState(() => getCachedEntries()?.length ?? 0);
 
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const recorderState = useAudioRecorderState(recorder, 50);

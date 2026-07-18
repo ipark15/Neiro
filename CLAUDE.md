@@ -98,6 +98,9 @@ EXPO_PUBLIC_API_URL=http://<your-mac-ip>:8000   ← https Railway URL in product
 GROQ_API_KEY=...
 SUPABASE_URL=https://oawsvakrhhrbrxektpwz.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=...
+SUPABASE_JWT_SECRET=...   ← optional but recommended: Dashboard → Settings → API → JWT Secret.
+                            Lets the backend verify tokens locally (~0ms) instead of a
+                            network round-trip to Supabase Auth on each new token.
 ```
 
 ---
